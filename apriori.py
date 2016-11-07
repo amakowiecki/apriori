@@ -109,7 +109,7 @@ def get_transactions_from_csv(filepath):
 
 
 def test():
-    filepath = r"C:\Users\Ja\Downloads\Apriori-master\Apriori-master\INTEGRATED-DATASET.csv"
+    filepath = "tesco.csv"
     transactions = get_transactions_from_csv(filepath)
     apriori = Apriori(transactions, 0.1, 0.0, 0)
     relations = apriori.get_relations()
