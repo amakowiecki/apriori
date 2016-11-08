@@ -19,6 +19,12 @@ class Apriori:
     def get_support(self, item):
         return self.frequency[item] / self.tran_count
 
+    def get_confidence(self, item_set, item):
+        return self.get_support(item_set) / self.get_support(item)
+
+    def get_lift(self, item_set, item):
+        return self.get_confidence(item_set, item)/self.get_support(item)
+
     def gen_candidates(self, items_set, length):
         return frozenset([i.union(j) for i in items_set for j in items_set if len(i.union(j)) == length])
 
@@ -69,7 +75,7 @@ class Apriori:
         return relations
 
     def get_rules(self):
-        """Zwraca listę reguł w formacie ((poprzedniki reguły), (następniki reguły), pewność) """
+        """Zwraca listę reguł w formacie ((poprzedniki reguły), (następniki reguły), pewność, lift) """
         rules = []  # lista reguł w formacie ((item1),  )
         for count, item_sets in self.rel_items_set.items():
             if count < self.min_rel_elements:
@@ -79,9 +85,10 @@ class Apriori:
                 for item in subsets:
                     remain = item_set.difference(item)
                     if len(remain):
-                        confidence = self.get_support(item_set) / self.get_support(item)
+                        confidence = self.get_confidence(item_set, item)
                         if confidence >= self.min_confidence:
-                            rules.append((tuple(item), tuple(remain), confidence))
+                            lift = self.get_lift(item_set, item)
+                            rules.append((tuple(item), tuple(remain), confidence, lift))
         return rules
 
 
@@ -120,7 +127,7 @@ def test():
     for rel in relations:
         print(rel)
     print("\n        ==REGUŁY==")
-    print("(poprzedniki) => (następniki), pewność")
+    print("(poprzedniki) => (następniki), pewność,lift")
     print("---------------------------------------")
     for r in rules:
         print(r)
