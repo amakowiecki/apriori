@@ -1,7 +1,46 @@
-# coding: utf-8
+import tempfile
+from collections import OrderedDict
+
+from celery import Celery
+from flask import Flask, render_template, request, url_for, redirect
+
+# Celery Broker and Result backend config
+flask_app = Flask(__name__)
+flask_app.config.update(
+    CELERY_BROKER_URL='redis://localhost:6379',
+    CELERY_RESULT_BACKEND='redis://localhost:6379',
+    CELERY_ACCEPT_CONTENT=['pickle']
+)
+
+
+# Configure celery to work with flask
+def make_celery(app):
+    task_manager = Celery(
+        app.import_name,
+        backend=app.config['CELERY_BROKER_URL'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    task_manager.conf.update(app.config)
+
+    TaskBase = task_manager.Task
+
+    class ContextTask(TaskBase):
+        abstract = True
+
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return TaskBase.__call__(self, *args, **kwargs)
+
+    task_manager.Task = ContextTask
+    return task_manager
+
+
+# Initialize celery app
+celery_app = make_celery(flask_app)
+
+#############################################################
 from collections import defaultdict
 from itertools import chain, combinations
-from optparse import OptionParser
 
 
 # noinspection PyMethodMayBeStatic
@@ -22,7 +61,7 @@ class Apriori:
         return self.get_support(item_set) / self.get_support(item)
 
     def get_lift(self, item_set, item):
-        return self.get_confidence(item_set, item) / self.get_support(item)
+        return self.get_confidence(item_set, item)/self.get_support(item)
 
     def gen_candidates(self, items_set, length):
         return frozenset([i.union(j) for i in items_set for j in items_set if len(i.union(j)) == length])
@@ -91,79 +130,69 @@ class Apriori:
         return rules
 
 
-def get_transactions_from_csv(filepath):
-    file = open(filepath)
-    transactions = list()
+def get_transactions_from_csv(filename):
+    file = open(filename)
+    return get_transactions_from_file(file)
+
+
+def get_transactions_from_file(file):
+    transactions = []
     for line in file:
         transaction = frozenset(line.strip().rstrip(',').split(','))
         transactions.append(transaction)
     return transactions
 
 
-def main():
-    opt_parser = OptionParser()
-    opt_parser.add_option("-f", "--filepath", dest="filepath", help="ścieżka do pliku wejściowego")
-    opt_parser.add_option("-s", "--support", dest="min_support", default=0.1, help="minimalna wartość wsparcia (support)")
-    opt_parser.add_option("-c", "--confidence", dest="min_confidence", default=0.2, help="minimalna wartość pewności (confidence)")
-    opt_parser.add_option("-e", "--elements", dest="min_rel_elements", default=2, help="minimalna liczba elementów w relacji")
-    opt_parser.add_option("-o", "--output", dest="out", default=False, help="sciezka pliku wyjsciowego, jesli nie podana wyjscie na konsole")
-    (options, args) = opt_parser.parse_args()
-    if not options.filepath:
-        print("Nie podano ścieżki pliku wejściowego")
-        return
-    transactions = get_transactions_from_csv(options.filepath)
-    apriori = Apriori(transactions, options.min_support, options.min_confidence, options.min_rel_elements)
-    relations = apriori.get_relations()
-    rules = apriori.get_rules()
-    formated_rules = format_rules(rules)
-    output = options.out
-    if output:
-        outfile = open(output, 'w')
-        outfile.write(formated_rules)
-        outfile.close()
-    else:
-        print(formated_rules)
+#############################################################
+
+tasks = OrderedDict()
 
 
-def format_rules(rules):
-    result = "              ==REGUŁY==\n"
-    result += "(poprzedniki) ==> (następniki), pewność, lift\n"
-    result += "-----------------------------------------------\n"
-
-    for rule in rules:
-        result += "("
-        for element in rule[0]:
-            result += element + ", "
-        result = result[:-2]
-        result += ") ==> ("
-        for element in rule[1]:
-            result += element + ", "
-        result = result[:-2]
-        result += "), {0:.3}, {1:.3}\n".format(rule[2], rule[3])
-    return result
+@celery_app.task()
+def apriori(transactions, min_support=0.1, min_confidence=0.0, min_rel_elements=0):
+    result = Apriori(transactions, min_support, min_confidence, min_rel_elements)
+    return [result.get_relations(), result.get_rules()]
 
 
-def test():
-    # filepath = "tesco.csv"
-    filepath = r"asoc_l.csv"
-    transactions = get_transactions_from_csv(filepath)
-    apriori = Apriori(transactions, 0.1, 0.2, 7)
-    relations = apriori.get_relations()
-    rules = apriori.get_rules()
-    # print("    ==RELACJE==")
-    # print("(elementy), wsparcie")
-    # print("----------------------")
-    # for rel in relations:
-    #     print(rel)
-    # print("\n        ==REGUŁY==")
-    # print("(poprzedniki) => (następniki), pewność,lift")
-    # print("---------------------------------------")
-    # for r in rules:
-    #     print(r)
-    formated_rules = format_rules(rules)
-    print(formated_rules)
+@flask_app.route('/')
+def home():
+    return render_template('index.html')
 
 
-# test()
-if __name__ == "__main__":
-    main()
+@flask_app.route('/run', methods=['GET', 'POST'])
+def run():
+    if request.method == 'GET':
+        return render_template('run.html')
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        min_support = request.form.get('min_support')
+        min_confidence = request.form.get('min_confidence')
+        min_rel_elements = request.form.get('min_rel_elements')
+        file = request.files['file']
+
+        if min_support is '' or min_confidence is '' or min_rel_elements is '':
+            raise AttributeError()
+
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(file.read())
+            f.flush()
+            task = apriori.delay(
+                get_transactions_from_csv(f.name),
+                float(min_support),
+                float(min_confidence),
+                float(min_rel_elements))
+            task.name = name
+            tasks[task.task_id] = task
+
+        return redirect(url_for('tasks_list'))
+
+
+@flask_app.route('/tasks')
+def tasks_list():
+    return render_template('tasks.html', data=[(k, v) for (k, v) in tasks.items()])
+
+
+@flask_app.route('/task/<task_id>')
+def task_by_id(task_id):
+    return render_template('task.html', data=tasks[task_id])

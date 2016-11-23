@@ -1,0 +1,44 @@
+{% extends "index.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-xs-5 col-xs-offset-1">
+        <table class="table table-hover">
+            <thead>
+            <tr>
+                <th>Reguła</th>
+                <th>Pewność</th>
+                <th>LIFT</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in data.result.1 %}
+            <tr>
+                <td>{{item.0}} -> {{item.1}}</td>
+                <td>{{item.2|round(2) }}</td>
+                <td>{{item.3|round(2) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="col-xs-4 col-xs-offset-1">
+        <table class="table table-hover">
+            <thead>
+            <tr>
+                <th>Elementy</th>
+                <th>Wsparcie</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in data.result.0 %}
+            <tr>
+                <td>{{item.0}}</td>
+                <td>{{item.1|round(2)}}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,4 +1,5 @@
 # coding: utf-8
+import datetime
 from collections import defaultdict
 from itertools import chain, combinations
 from optparse import OptionParser
@@ -22,7 +23,7 @@ class Apriori:
         return self.get_support(item_set) / self.get_support(item)
 
     def get_lift(self, item_set, item):
-        return self.get_confidence(item_set, item) / self.get_support(item)
+        return self.get_confidence(item_set, item)/self.get_support(item)
 
     def gen_candidates(self, items_set, length):
         return frozenset([i.union(j) for i in items_set for j in items_set if len(i.union(j)) == length])
@@ -100,70 +101,36 @@ def get_transactions_from_csv(filepath):
     return transactions
 
 
-def main():
-    opt_parser = OptionParser()
-    opt_parser.add_option("-f", "--filepath", dest="filepath", help="ścieżka do pliku wejściowego")
-    opt_parser.add_option("-s", "--support", dest="min_support", default=0.1, help="minimalna wartość wsparcia (support)")
-    opt_parser.add_option("-c", "--confidence", dest="min_confidence", default=0.2, help="minimalna wartość pewności (confidence)")
-    opt_parser.add_option("-e", "--elements", dest="min_rel_elements", default=2, help="minimalna liczba elementów w relacji")
-    opt_parser.add_option("-o", "--output", dest="out", default=False, help="sciezka pliku wyjsciowego, jesli nie podana wyjscie na konsole")
-    (options, args) = opt_parser.parse_args()
-    if not options.filepath:
-        print("Nie podano ścieżki pliku wejściowego")
-        return
-    transactions = get_transactions_from_csv(options.filepath)
-    apriori = Apriori(transactions, options.min_support, options.min_confidence, options.min_rel_elements)
-    relations = apriori.get_relations()
-    rules = apriori.get_rules()
-    formated_rules = format_rules(rules)
-    output = options.out
-    if output:
-        outfile = open(output, 'w')
-        outfile.write(formated_rules)
-        outfile.close()
-    else:
-        print(formated_rules)
-
-
-def format_rules(rules):
-    result = "              ==REGUŁY==\n"
-    result += "(poprzedniki) ==> (następniki), pewność, lift\n"
-    result += "-----------------------------------------------\n"
-
-    for rule in rules:
-        result += "("
-        for element in rule[0]:
-            result += element + ", "
-        result = result[:-2]
-        result += ") ==> ("
-        for element in rule[1]:
-            result += element + ", "
-        result = result[:-2]
-        result += "), {0:.3}, {1:.3}\n".format(rule[2], rule[3])
-    return result
+# def main():
+#     opt_parser = OptionParser()
+#     opt_parser.add_option("-f", "--filepath", dest="filepath", help="ścieżka do pliku wejściowego")
+#     opt_parser.add_option("-s", "--support", dest="min_support", default=0.01, help="minimalna wartość wsparcia (support)")
+#     opt_parser.add_option("-c", "--confidence", dest="min_confidence", default=0.0, help="minimalna wartość pewności (confidence)")
+#     opt_parser.add_option("-e", "--elements", dest="min_rel_elements", default=2, help="minimalna liczba elementów w relacji")
+#     (options, args) = opt_parser.parse_args()
+#
+#     transactions = get_transactions_from_csv(options.filepath)
+#     apriori = Apriori(transactions, options.min_support, options.min_confidence, options.min_rel_elements)
+#     relations = apriori.get_relations()
+#     rules = apriori.get_rules()
 
 
 def test():
-    # filepath = "tesco.csv"
-    filepath = r"asoc_l.csv"
+    filepath = "tesco.csv"
     transactions = get_transactions_from_csv(filepath)
-    apriori = Apriori(transactions, 0.1, 0.2, 7)
+    apriori = Apriori(transactions, 0.1, 0.0, 0)
     relations = apriori.get_relations()
     rules = apriori.get_rules()
-    # print("    ==RELACJE==")
-    # print("(elementy), wsparcie")
-    # print("----------------------")
-    # for rel in relations:
-    #     print(rel)
-    # print("\n        ==REGUŁY==")
-    # print("(poprzedniki) => (następniki), pewność,lift")
-    # print("---------------------------------------")
-    # for r in rules:
-    #     print(r)
-    formated_rules = format_rules(rules)
-    print(formated_rules)
+    print("    ==RELACJE==")
+    print("(elementy), wsparcie")
+    print("----------------------")
+    for rel in relations:
+        print(rel)
+    print("\n        ==REGUŁY==")
+    print("(poprzedniki) => (następniki), pewność,lift")
+    print("---------------------------------------")
+    for r in rules:
+        print(r)
 
 
-# test()
-if __name__ == "__main__":
-    main()
+test()

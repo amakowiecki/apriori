@@ -1,0 +1,19 @@
+Aby uruchomić program wymagany jest python w wersji 3.5 lub większej.
+W celu uruchomienia programu w trybie tekstowym należy w konsoli przejść do katalogu aplikacji i wywołać komendę "python apriori.py" dodając następujące argumentu
+
+	-f [ścieżka do pliku z danymi wejściowymi]
+	-s [wsparcie] (opcjonalny, domyślnie 0.1)
+	-c [pewność] (opcjonalny, domyślnie 0.2)
+	-e [liczba elementów] (opcjonalny, domyślnie 2)
+	-o [ścieżka pliku wyjściowego, domyślnie wyjście wypisywane na ekran]
+
+
+Aby uruchomić wersję webową należy zainstalować następujące biblioteki:
+    fask oraz celery oraz redis (pip install celery flask)
+
+Nastepnie odpalic ponizsze polecenia w katalogu gdzie sa pliki aplikacji:
+docker run -d -p 6379:6379 redis (w przypadku kiedy nie mamy zainstalowanego redisa, wtedy mozemy uruchomic gotowy obraz kontenera)
+export FLASK_APP=apriori.py
+flask run
+celery -A apriori_web.celery_app worker
+celery flower -A apriori_web.celery_app --address=127.0.0.1 --port=5555
